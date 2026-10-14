@@ -9,8 +9,7 @@ import PlatformGrid from '../components/landing/PlatformGrid';
 import FeaturesRow from '../components/landing/FeaturesRow';
 import OpportunityProfile3D from '../components/landing/OpportunityProfile3D';
 import FloatingTokens3D from '../components/landing/FloatingTokens3D';
-import CommunityStats from '../components/landing/CommunityStats';
-import TestimonialsCarousel from '../components/landing/TestimonialsCarousel';
+import CorePillarsShowcase from '../components/landing/CorePillarsShowcase';
 import CtaBanner from '../components/landing/CtaBanner';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -261,14 +260,9 @@ export default function LandingPage() {
       </section>
 
       {/* =========================================================================
-          COMMUNITY METRICS: "A Growing Community Worldwide"
+          CORE PLATFORM ARCHITECTURE: 5 Pillars of DevPulse
           ========================================================================= */}
-      <CommunityStats />
-
-      {/* =========================================================================
-          TESTIMONIALS CAROUSEL
-          ========================================================================= */}
-      <TestimonialsCarousel />
+      <CorePillarsShowcase />
 
       {/* =========================================================================
           BOTTOM CTA BANNER

@@ -8,6 +8,7 @@ import platformRoutes from './routes/platformRoutes.js';
 import repositoryRoutes from './routes/repositoryRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import portfolioRoutes from './routes/portfolioRoutes.js';
+import problemRoutes from './routes/problemRoutes.js';
 import { optionalAuth, requireAuth } from './middleware/auth.js';
 import { User } from './models/User.js';
 import { PlatformStats } from './models/PlatformStats.js';
@@ -120,6 +121,7 @@ app.use('/api/repositories', repositoryRoutes);
 app.use('/api/ai-insights', aiRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/problems', problemRoutes);
 
 // --- USER & PROFILE ROUTES ---
 app.get('/api/user/profile', optionalAuth, async (req, res) => {
@@ -573,18 +575,7 @@ app.get('/api/leaderboard', optionalAuth, async (req, res) => {
   }
 });
 
-// --- PROBLEMS & GOALS ---
-app.get('/api/problems', (req, res) => {
-  const { difficulty, platform } = req.query;
-  let filtered = [...req.app.locals.problems];
-  if (difficulty && difficulty !== 'All') {
-    filtered = filtered.filter(p => p.difficulty.toLowerCase() === difficulty.toLowerCase());
-  }
-  if (platform && platform !== 'All') {
-    filtered = filtered.filter(p => p.platform.toLowerCase() === platform.toLowerCase());
-  }
-  return res.json({ success: true, problems: filtered });
-});
+// --- GOALS ---
 
 app.get('/api/goals', (req, res) => {
   return res.json({ success: true, goals: req.app.locals.goals });

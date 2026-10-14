@@ -118,11 +118,7 @@ export const platformBarChartData = [
 
 export const achievementsData = [];
 
-export const sampleProblemsData = [
-  { id: 'p1', title: 'Two Sum', difficulty: 'Easy', platform: 'LeetCode', category: 'Array / Hash Table', solved: true, date: 'Recent', accuracy: '89%' },
-  { id: 'p2', title: 'LRU Cache Implementation', difficulty: 'Medium', platform: 'LeetCode', category: 'Design / Linked List', solved: true, date: 'Recent', accuracy: '74%' },
-  { id: 'p3', title: 'Valid Parentheses', difficulty: 'Easy', platform: 'LeetCode', category: 'Stack', solved: true, date: 'Recent', accuracy: '91%' }
-];
+export const sampleProblemsData = [];
 
 export const sampleRepositoriesData = [];
 

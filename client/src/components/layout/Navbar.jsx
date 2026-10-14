@@ -29,18 +29,10 @@ export default function Navbar() {
     { name: 'Features', href: '#features' },
     { name: 'Integrations', href: '#integrations' },
     { name: 'Leaderboard', href: '/leaderboard', isRoute: true },
-    { name: 'Pricing', isPricing: true },
     { name: 'Blog', href: '#features' }
   ];
 
   const handleLinkClick = (e, item) => {
-    if (item.isPricing) {
-      e.preventDefault();
-      setIsPricingOpen(true);
-      setMobileMenuOpen(false);
-      return;
-    }
-
     if (item.isRoute) {
       return; // normal Link handling
     }
@@ -58,7 +50,7 @@ export default function Navbar() {
       {/* Outer Floating Wrapper with Spacing Over the Navbar */}
       <header className="sticky top-0 z-50 w-full pt-3 sm:pt-4 pb-2 px-3 sm:px-6 lg:px-8 transition-all duration-300">
         <div
-          className={`max-w-7xl mx-auto rounded-full transition-all duration-300 px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border ${
+          className={`max-w-7xl mx-auto rounded-full transition-all duration-300 px-6 py-3 flex items-center justify-between border ${
             isScrolled
               ? 'bg-white/90 dark:bg-[#0B0D11]/90 backdrop-blur-2xl border-slate-200/90 dark:border-white/10 shadow-lg shadow-black/[0.04] dark:shadow-black/40'
               : 'bg-white/75 dark:bg-[#0B0D11]/75 backdrop-blur-xl border-slate-200/70 dark:border-white/10 shadow-sm shadow-black/[0.02] dark:shadow-black/20'
@@ -96,7 +88,7 @@ export default function Navbar() {
           </nav>
 
           {/* Right: Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
 
             {isAuthenticated ? (
@@ -120,10 +112,10 @@ export default function Navbar() {
 
             <Link
               to={isAuthenticated ? '/dashboard' : '/register'}
-              className="flex items-center gap-1.5 px-4.5 py-2 rounded-full text-[13px] font-semibold bg-[#111315] text-white hover:bg-black dark:bg-[#E5A952] dark:text-[#0B0D11] dark:hover:bg-[#dfa048] shadow-xs hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200"
+              className="px-5 py-2.5 rounded-full font-semibold inline-flex items-center gap-2 text-[13px] bg-[#111315] text-white hover:bg-black dark:bg-[#E5A952] dark:text-[#0B0D11] dark:hover:bg-[#dfa048] shadow-xs hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200"
             >
               <span>{isAuthenticated ? 'Open App' : 'Get started'}</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 

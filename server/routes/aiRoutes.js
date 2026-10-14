@@ -26,6 +26,32 @@ function parseJsonSafely(text) {
   return JSON.parse(cleaned);
 }
 
+export function calculateDeterministicCompetency(stats = {}, repos = [], languages = []) {
+  // LeetCode solved (up to 45 pts)
+  const easy = Number(stats.easySolved || 0);
+  const med = Number(stats.mediumSolved || 0);
+  const hard = Number(stats.hardSolved || 0);
+  const solved = Number(stats.problemsSolved || stats.leetcodeProblems || (easy + med + hard) || 0);
+  const lcPoints = Math.min(45, (easy * 0.4) + (med * 1.4) + (hard * 3.2) + (solved > 0 && (easy + med + hard === 0) ? Math.min(30, solved * 0.6) : 0));
+
+  // GitHub Repos & Stars (up to 25 pts)
+  const repoCount = Number(repos.length || stats.totalRepositories || 0);
+  const totalStars = repos.reduce((acc, r) => acc + Number(r.stargazers_count || r.stars || 0), 0);
+  const ghPoints = Math.min(25, (repoCount * 2.2) + (totalStars * 2.5));
+
+  // Streak & Contributions (up to 20 pts)
+  const streak = Number(stats.currentStreak || 0);
+  const contributions = Number(stats.totalContributions || 0);
+  const activityPoints = Math.min(20, Math.min(10, streak * 0.8) + Math.min(10, Math.floor(contributions / 25)));
+
+  // Language Variety (up to 10 pts)
+  const langCount = Array.isArray(languages) ? languages.length : 0;
+  const langPoints = Math.min(10, langCount * 2.5);
+
+  const baseline = Math.round(35 + lcPoints + ghPoints + activityPoints + langPoints);
+  return Math.min(96, Math.max(25, baseline));
+}
+
 /**
  * GET /api/ai-insights
  * Retrieve the latest saved AI Report for the authenticated user
@@ -35,22 +61,66 @@ router.get('/', optionalAuth, async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const apiKeyConfigured = Boolean(process.env.OPENROUTER_API_KEY || req.user?.openRouterApiKey);
 
+    let baselineScore = 75;
     if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
-      const latestReport = await AIReport.findOne({ userId }).sort({ createdAt: -1 });
+      const dbUser = await User.findById(userId).lean();
+      const repos = await Repository.find({ userId }).lean().catch(() => []);
+      const ghStats = await PlatformStats.findOne({ userId, platform: 'github' }).lean().catch(() => null);
+
+      if (dbUser) {
+        baselineScore = calculateDeterministicCompetency(
+          {
+            ...dbUser.stats,
+            easySolved: dbUser.connectedPlatforms?.leetcode?.easySolved,
+            mediumSolved: dbUser.connectedPlatforms?.leetcode?.mediumSolved,
+            hardSolved: dbUser.connectedPlatforms?.leetcode?.hardSolved
+          },
+          repos,
+          ghStats?.stats?.languageDistribution || []
+        );
+      }
+
+      const latestReport = await AIReport.findOne({ userId }).sort({ createdAt: -1 }).lean();
       if (latestReport) {
+        const finalScore = (latestReport.overallScore && latestReport.overallScore !== 82)
+          ? latestReport.overallScore
+          : baselineScore;
+
         return res.json({
           success: true,
-          report: latestReport,
+          report: {
+            ...latestReport,
+            overallScore: finalScore
+          },
           apiKeyConfigured
         });
       }
+    } else {
+      const current = req.app.locals.currentUser;
+      baselineScore = calculateDeterministicCompetency(
+        {
+          ...current?.stats,
+          easySolved: current?.connectedPlatforms?.leetcode?.easySolved,
+          mediumSolved: current?.connectedPlatforms?.leetcode?.mediumSolved,
+          hardSolved: current?.connectedPlatforms?.leetcode?.hardSolved
+        },
+        req.app.locals.repositories || [],
+        req.app.locals.languageDistribution || []
+      );
     }
 
-    // In-memory or initial fallback
+    // In-memory or initial fallback with dynamic baseline score
     const memCoach = req.app.locals.aiCoach;
+    const finalMemScore = (memCoach?.overallScore && memCoach.overallScore !== 82)
+      ? memCoach.overallScore
+      : baselineScore;
+
     return res.json({
       success: true,
-      report: memCoach,
+      report: {
+        ...memCoach,
+        overallScore: finalMemScore
+      },
       apiKeyConfigured
     });
   } catch (err) {
@@ -117,17 +187,32 @@ router.post('/generate', optionalAuth, async (req, res) => {
 
     const languages = ghStats?.stats?.languageDistribution || [];
 
+    // Calculate deterministic baseline score from user's real MongoDB stats
+    const deterministicBaselineScore = calculateDeterministicCompetency(
+      {
+        ...user?.stats,
+        easySolved,
+        mediumSolved,
+        hardSolved,
+        problemsSolved: leetcodeSolved,
+        currentStreak,
+        totalRepositories: totalRepos
+      },
+      repos,
+      languages
+    );
+
     const systemPrompt = `You are DevPulse AI, an elite developer career intelligence coach.
 Analyze the provided developer telemetry and output strictly valid JSON matching this exact structure:
 {
-  "overallScore": 78,
+  "overallScore": <calculated_score_0_to_100>,
   "summary": "Personalized 2-sentence executive summary of the developer's current profile.",
   "skillAnalysis": [
-    { "skill": "Data Structures", "score": 80, "level": "Advanced", "feedback": "Detailed feedback on DSA mastery..." },
-    { "skill": "Algorithms", "score": 72, "level": "Intermediate", "feedback": "Detailed feedback on algorithmic thinking..." },
-    { "skill": "System Design", "score": 60, "level": "Developing", "feedback": "Detailed feedback on architectural concepts..." },
-    { "skill": "Web Development", "score": 88, "level": "Advanced", "feedback": "Detailed feedback on full stack skills..." },
-    { "skill": "Machine Learning / AI", "score": 65, "level": "Intermediate", "feedback": "Detailed feedback on AI/ML readiness..." }
+    { "skill": "Data Structures", "score": <calculated_score_0_to_100>, "level": "Advanced | Intermediate | Developing", "feedback": "Detailed feedback on DSA mastery..." },
+    { "skill": "Algorithms", "score": <calculated_score_0_to_100>, "level": "Advanced | Intermediate | Developing", "feedback": "Detailed feedback on algorithmic thinking..." },
+    { "skill": "System Design", "score": <calculated_score_0_to_100>, "level": "Advanced | Intermediate | Developing", "feedback": "Detailed feedback on architectural concepts..." },
+    { "skill": "Web Development", "score": <calculated_score_0_to_100>, "level": "Advanced | Intermediate | Developing", "feedback": "Detailed feedback on full stack skills..." },
+    { "skill": "Machine Learning / AI", "score": <calculated_score_0_to_100>, "level": "Advanced | Intermediate | Developing", "feedback": "Detailed feedback on AI/ML readiness..." }
   ],
   "roadmap": [
     {
@@ -191,6 +276,7 @@ CRITICAL RULES:
 - Active Streak: ${currentStreak} days
 - Total Contributions: ${user?.stats?.totalContributions || 0}
 - Current Rating: ${user?.stats?.rating || 0}
+- Telemetry-Derived Baseline Developer Competency Score: ${deterministicBaselineScore}/100 (Calibrate your overallScore and individual skill scores around this real activity baseline).
 
 Provide an actionable, realistic, high-value career intelligence assessment based on this real data.`;
 
@@ -256,8 +342,17 @@ Provide an actionable, realistic, high-value career intelligence assessment base
       actionUrl: rec.actionUrl || rec.link || '/problems'
     }));
 
+    let calculatedOverall = Number(parsedJson.overallScore);
+    if (!calculatedOverall || isNaN(calculatedOverall) || calculatedOverall === 82 || calculatedOverall === 78) {
+      if (parsedJson.skillAnalysis?.length) {
+        calculatedOverall = Math.round(parsedJson.skillAnalysis.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / parsedJson.skillAnalysis.length);
+      } else {
+        calculatedOverall = deterministicBaselineScore;
+      }
+    }
+
     const reportData = {
-      overallScore: Number(parsedJson.overallScore) || 75,
+      overallScore: calculatedOverall,
       summary: parsedJson.summary || 'Solid full stack competency with high growth trajectory in algorithmic problem solving.',
       skillAnalysis: parsedJson.skillAnalysis || [],
       roadmap: formattedRoadmap,

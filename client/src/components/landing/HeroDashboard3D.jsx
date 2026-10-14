@@ -3,24 +3,31 @@ import { motion } from 'framer-motion';
 import {
   TrendingUp,
   Search,
-  Bell,
   Code2,
   BarChart2,
   Sparkles,
   Trophy,
-  GitBranch,
   Layers,
   ArrowUpRight,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  Activity
 } from 'lucide-react';
-import DevPulseLogo from '../common/DevPulseLogo';
+import { useAuth } from '../../context/AuthContext';
 
 export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
-  const [activeTab, setActiveTab] = useState('Overview');
   const [hoveredCell, setHoveredCell] = useState(null);
+  const { isAuthenticated, user } = useAuth();
 
-  // Generate a realistic contribution heatmap (28 columns x 5 rows)
+  // Dynamic values based on authentication status
+  const userSolved = user?.stats?.problemsSolved ?? user?.connectedPlatforms?.leetcode?.solved ?? 0;
+  const userStreak = user?.stats?.currentStreak ?? 0;
+  const userRepos = user?.stats?.totalRepositories ?? 0;
+  const userRating = user?.stats?.rating || 0;
+  const userContributions = user?.stats?.totalContributions || userSolved || 0;
+  const userNameInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+
+  // Realistic contribution heatmap matrix (28 columns x 5 rows)
   const heatmapData = [
     [1, 2, 0, 3, 4, 2, 1, 0, 2, 4, 3, 2, 1, 3, 4, 2, 0, 1, 3, 2, 4, 3, 1, 2, 0, 3, 4, 2],
     [2, 0, 1, 4, 3, 1, 2, 3, 1, 2, 4, 1, 0, 2, 3, 4, 1, 2, 0, 3, 2, 4, 1, 3, 2, 1, 3, 4],
@@ -46,7 +53,7 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
 
   return (
     <div className="relative w-full max-w-xl mx-auto perspective-container select-none">
-      {/* Background Golden Ribbon Trail (curling behind) */}
+      {/* Background Golden Ribbon Trail */}
       <svg
         className="absolute -top-16 -right-12 w-96 h-96 pointer-events-none opacity-40 dark:opacity-60 -z-10 filter blur-xs"
         viewBox="0 0 400 400"
@@ -77,7 +84,7 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
         </defs>
       </svg>
 
-      {/* Floating "Your Growth" Card (Positioned in front with 3D Pop) */}
+      {/* Floating Growth / Telemetry Card */}
       <motion.div
         animate={{
           y: [0, -8, 0],
@@ -99,17 +106,21 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
               <TrendingUp className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white">Your Growth</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Monthly Velocity</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                {isAuthenticated ? 'Your Growth' : 'Growth Engine'}
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {isAuthenticated ? 'Activity Velocity' : 'Telemetry Stream'}
+              </p>
             </div>
           </div>
           <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
             <ArrowUpRight className="w-3 h-3" />
-            +42%
+            {isAuthenticated ? `+${Math.min(userStreak || 12, 100)}%` : 'Real-time'}
           </span>
         </div>
 
-        {/* Animated Smooth Area Wave Chart */}
+        {/* Area Wave Chart */}
         <div className="h-14 w-full pt-1 relative">
           <svg viewBox="0 0 200 60" className="w-full h-full overflow-visible">
             <defs>
@@ -129,21 +140,22 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
               strokeWidth="2.5"
               strokeLinecap="round"
             />
-            {/* Glowing Pulse Node */}
             <circle cx="200" cy="6" r="4" fill="#E5A952" className="animate-ping" opacity="0.75" />
             <circle cx="200" cy="6" r="3.5" fill="#FFFFFF" stroke="#E5A952" strokeWidth="2" />
           </svg>
         </div>
 
         <div className="flex justify-between items-center text-[9px] text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
-          <span>May</span>
-          <span>Jul</span>
-          <span>Sep</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-200">Current (Oct)</span>
+          <span>Q1</span>
+          <span>Q2</span>
+          <span>Q3</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-200">
+            {isAuthenticated ? 'Current' : 'Live Sync'}
+          </span>
         </div>
       </motion.div>
 
-      {/* Main 3D Laptop / Tablet Shell */}
+      {/* Main 3D Laptop Shell */}
       <div
         className="w-full rounded-2xl p-2 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 dark:from-slate-700 dark:via-slate-800 dark:to-slate-950 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] border border-white/60 dark:border-white/10 transition-transform duration-200 ease-out"
         style={{
@@ -198,8 +210,8 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
                   <span className="font-bold text-slate-900 dark:text-white text-xs">
                     DevPulse Dashboard
                   </span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
-                    PRO
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold tracking-wide">
+                    {isAuthenticated ? 'LIVE SYNC' : 'TELEMETRY ACTIVE'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -207,33 +219,63 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
                     <Search className="w-2.5 h-2.5" />
                     <span className="truncate">Search stats...</span>
                   </div>
-                  <span className="w-5 h-5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[9px] font-bold flex items-center justify-center border border-amber-500/30">
-                    U
-                  </span>
+                  {isAuthenticated ? (
+                    <span className="w-5 h-5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[9px] font-bold flex items-center justify-center border border-amber-500/30">
+                      {userNameInitial}
+                    </span>
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-amber-500/15 text-amber-500 text-[9px] flex items-center justify-center border border-amber-500/30">
+                      <Activity className="w-3 h-3" />
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* 4 Mini Metric Cards */}
               <div className="grid grid-cols-4 gap-2">
                 <div className="p-2 rounded-xl bg-white dark:bg-[#151922] border border-slate-200/80 dark:border-white/5 shadow-xs">
-                  <p className="text-[9px] text-slate-400">Solved</p>
-                  <p className="text-sm font-extrabold text-slate-900 dark:text-white">1,284</p>
-                  <span className="text-[8px] text-emerald-500 font-bold">+12%</span>
+                  <p className="text-[9px] text-slate-400">
+                    {isAuthenticated ? 'Solved' : 'Problem Tracker'}
+                  </p>
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    {isAuthenticated ? userSolved : '6 Platforms'}
+                  </p>
+                  <span className="text-[8px] text-emerald-500 font-bold">
+                    {isAuthenticated ? 'Synced' : 'Unified Sync'}
+                  </span>
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-[#151922] border border-slate-200/80 dark:border-white/5 shadow-xs">
-                  <p className="text-[9px] text-slate-400">Streak</p>
-                  <p className="text-sm font-extrabold text-amber-500">342d</p>
-                  <span className="text-[8px] text-amber-500 font-bold">🔥 Active</span>
+                  <p className="text-[9px] text-slate-400">
+                    {isAuthenticated ? 'Streak' : 'Streak Tracker'}
+                  </p>
+                  <p className="text-sm font-extrabold text-amber-500">
+                    {isAuthenticated ? `${userStreak}d` : 'Daily Sync'}
+                  </p>
+                  <span className="text-[8px] text-amber-500 font-bold">
+                    {isAuthenticated ? '🔥 Active' : 'Multi-Source'}
+                  </span>
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-[#151922] border border-slate-200/80 dark:border-white/5 shadow-xs">
-                  <p className="text-[9px] text-slate-400">Repos</p>
-                  <p className="text-sm font-extrabold text-slate-900 dark:text-white">156</p>
-                  <span className="text-[8px] text-blue-500 font-bold">Synced</span>
+                  <p className="text-[9px] text-slate-400">
+                    {isAuthenticated ? 'Repos' : 'Repositories'}
+                  </p>
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    {isAuthenticated ? userRepos : 'GitHub API'}
+                  </p>
+                  <span className="text-[8px] text-blue-500 font-bold">
+                    {isAuthenticated ? 'Verified' : 'Auto-Sync'}
+                  </span>
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-[#151922] border border-slate-200/80 dark:border-white/5 shadow-xs">
-                  <p className="text-[9px] text-slate-400">Percentile</p>
-                  <p className="text-sm font-extrabold text-emerald-500">Top 3%</p>
-                  <span className="text-[8px] text-slate-400">Global</span>
+                  <p className="text-[9px] text-slate-400">
+                    {isAuthenticated ? 'Rating' : 'AI Intelligence'}
+                  </p>
+                  <p className="text-sm font-extrabold text-emerald-500">
+                    {isAuthenticated ? (userRating > 0 ? userRating : 'Active') : 'OpenRouter'}
+                  </p>
+                  <span className="text-[8px] text-slate-400">
+                    {isAuthenticated ? 'DevPulse Rank' : 'Career Coach'}
+                  </span>
                 </div>
               </div>
 
@@ -245,7 +287,7 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
                       Contributions Matrix
                     </span>
                     <span className="text-[9px] text-slate-400">
-                      (3,214 total)
+                      {isAuthenticated ? `(${userContributions} total)` : '(Multi-Platform Telemetry)'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-[8px] text-slate-400">
@@ -283,7 +325,9 @@ export default function HeroDashboard3D({ mousePos = { x: 0, y: 0 } }) {
                   <span className="font-bold text-[10px] text-slate-800 dark:text-slate-200">
                     Coding Velocity Curve
                   </span>
-                  <span className="text-[9px] text-emerald-500 font-semibold">+18.4% WoW</span>
+                  <span className="text-[9px] text-emerald-500 font-semibold">
+                    {isAuthenticated ? 'Real-time Velocity' : 'Multi-Source Telemetry'}
+                  </span>
                 </div>
                 <div className="h-10 w-full">
                   <svg viewBox="0 0 300 45" className="w-full h-full">

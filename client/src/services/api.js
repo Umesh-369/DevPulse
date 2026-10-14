@@ -230,7 +230,19 @@ export const api = {
   problems: {
     get: async (params = {}) => {
       const q = new URLSearchParams(params).toString();
-      return fetchWithFallback(`/problems?${q}`, {}, { success: true, problems: sampleProblemsData });
+      return fetchWithFallback(`/problems?${q}`, {}, { success: true, problems: [], stats: { totalSolved: 0, easySolved: 0, mediumSolved: 0, hardSolved: 0 } });
+    },
+    sync: async (username) => {
+      return fetchWithFallback('/problems/sync', {
+        method: 'POST',
+        body: JSON.stringify(username ? { username } : {})
+      });
+    },
+    log: async (problemData) => {
+      return fetchWithFallback('/problems', {
+        method: 'POST',
+        body: JSON.stringify(problemData)
+      });
     }
   },
   repositories: {

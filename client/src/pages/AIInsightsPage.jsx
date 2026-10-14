@@ -154,6 +154,20 @@ export default function AIInsightsPage() {
     feedback: s.details || s.feedback || 'Consistent progress demonstrated across challenges.'
   }));
 
+  // Dynamic Developer Competency Score: backend score or rounded average of dynamic skill bars
+  const dynamicScore = (report?.overallScore !== undefined && report?.overallScore !== null && report?.overallScore !== 82)
+    ? Number(report.overallScore)
+    : (skillList.length > 0
+        ? Math.round(skillList.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / skillList.length)
+        : 75);
+
+  const getCandidateBadge = (score) => {
+    if (score >= 85) return 'Top 5% Candidate';
+    if (score >= 75) return 'Top 15% Candidate';
+    if (score >= 60) return 'Top 30% Candidate';
+    return 'Rising Developer';
+  };
+
   const roadmapList = report?.roadmap || [];
   const recommendationsList = report?.recommendations || [];
   const activeRoadmap = roadmapList.find(r => r.id === selectedRoadId) || roadmapList[0] || null;
@@ -302,6 +316,7 @@ export default function AIInsightsPage() {
                                 cx="50"
                                 cy="50"
                                 r="40"
+                                pathLength="100"
                                 className="stroke-slate-100 dark:stroke-white/5"
                                 strokeWidth="8"
                                 fill="none"
@@ -310,11 +325,12 @@ export default function AIInsightsPage() {
                                 cx="50"
                                 cy="50"
                                 r="40"
+                                pathLength="100"
                                 stroke="url(#scoreGrad)"
                                 strokeWidth="8"
                                 fill="none"
-                                strokeDasharray={2 * Math.PI * 40}
-                                strokeDashoffset={2 * Math.PI * 40 * (1 - (report?.overallScore || 78) / 100)}
+                                strokeDasharray="100"
+                                strokeDashoffset={100 - dynamicScore}
                                 strokeLinecap="round"
                                 className="transition-all duration-1000 ease-out"
                               />
@@ -328,7 +344,7 @@ export default function AIInsightsPage() {
 
                             <div className="absolute flex flex-col items-center justify-center text-center">
                               <span className="text-3xl font-black text-slate-900 dark:text-white">
-                                {report?.overallScore || 78}
+                                {dynamicScore}
                               </span>
                               <span className="text-[10px] font-semibold text-slate-400">Score / 100</span>
                             </div>
@@ -336,7 +352,7 @@ export default function AIInsightsPage() {
 
                           <div className="space-y-1.5 text-center sm:text-left">
                             <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full inline-block">
-                              {(report?.overallScore || 78) >= 80 ? 'Top 10% Candidate' : 'High Growth Candidate'}
+                              {getCandidateBadge(dynamicScore)}
                             </span>
                             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                               Evaluated across algorithms, full-stack design, codebase maintainability, and delivery.

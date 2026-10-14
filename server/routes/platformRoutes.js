@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { PlatformStats } from '../models/PlatformStats.js';
+import { Problem } from '../models/Problem.js';
 import { fetchLeetCodeStats } from '../services/leetcodeService.js';
 import { fetchGitHubStats } from '../services/githubService.js';
 import { optionalAuth } from '../middleware/auth.js';
@@ -80,6 +81,34 @@ router.post('/connect/leetcode', optionalAuth, async (req, res) => {
         },
         { upsert: true, new: true }
       );
+
+      // 3. Persist recent problems in Problem collection
+      if (stats.recentSubmissions?.length) {
+        const bulkOps = stats.recentSubmissions.map(sub => ({
+          updateOne: {
+            filter: { userId, problemId: sub.problemId, platform: 'LeetCode' },
+            update: {
+              $set: {
+                userId,
+                problemId: sub.problemId,
+                title: sub.title,
+                titleSlug: sub.titleSlug,
+                difficulty: sub.difficulty,
+                platform: 'LeetCode',
+                category: sub.category,
+                topicTags: sub.topicTags,
+                solved: true,
+                solvedAt: sub.solvedAt,
+                url: sub.url,
+                accuracy: sub.accuracy,
+                isCustom: false
+              }
+            },
+            upsert: true
+          }
+        }));
+        await Problem.bulkWrite(bulkOps).catch(err => console.warn('Bulk write problems error:', err.message));
+      }
     }
 
     // Also update in-memory current user for seamless fallback
@@ -123,6 +152,10 @@ router.post('/connect/leetcode', optionalAuth, async (req, res) => {
     if (req.app.locals.platformBarChart?.length) {
       const lastBar = req.app.locals.platformBarChart[req.app.locals.platformBarChart.length - 1];
       if (lastBar) lastBar.LeetCode = Math.min(stats.solved, 120);
+    }
+
+    if (stats.recentSubmissions?.length) {
+      req.app.locals.problems = stats.recentSubmissions;
     }
 
     req.app.locals.currentUser = current;
