@@ -198,9 +198,14 @@ router.post('/sync', optionalAuth, async (req, res) => {
               lcStats.stats.submissionCalendar
             );
             ghStats.contributions = ghStats.contributionCalendar.totalContributions;
-            dbUser.stats.totalContributions = ghStats.contributions;
+            ghStats.totalContributions = ghStats.contributions;
+            ghStats.heatmap = ghStats.contributionCalendar.heatmap;
           }
           dbUser.contributionCalendar = ghStats.contributionCalendar;
+          dbUser.totalContributions = ghStats.contributions;
+          dbUser.heatmap = ghStats.contributionCalendar.heatmap || ghStats.heatmap || [];
+          dbUser.stats.totalContributions = ghStats.contributions;
+          dbUser.stats.heatmap = dbUser.heatmap;
         }
         await dbUser.save();
       }
@@ -211,6 +216,8 @@ router.post('/sync', optionalAuth, async (req, res) => {
           userId,
           platform: 'github',
           handle: cleanUsername,
+          totalContributions: ghStats.contributions,
+          heatmap: ghStats.contributionCalendar?.heatmap || ghStats.heatmap || [],
           stats: ghStats,
           lastSynced: new Date()
         },
@@ -223,7 +230,10 @@ router.post('/sync', optionalAuth, async (req, res) => {
       savedRepos = ghStats.repositories;
       if (ghStats.contributionCalendar) {
         req.app.locals.currentUser.contributionCalendar = ghStats.contributionCalendar;
+        req.app.locals.currentUser.totalContributions = ghStats.contributions;
+        req.app.locals.currentUser.heatmap = ghStats.contributionCalendar.heatmap || ghStats.heatmap || [];
         req.app.locals.currentUser.stats.totalContributions = ghStats.contributions;
+        req.app.locals.currentUser.stats.heatmap = req.app.locals.currentUser.heatmap;
       }
     }
 

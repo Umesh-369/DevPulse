@@ -224,9 +224,14 @@ router.post('/connect/github', optionalAuth, async (req, res) => {
               lcStats.stats.submissionCalendar
             );
             stats.contributions = stats.contributionCalendar.totalContributions;
-            updatedUser.stats.totalContributions = stats.contributions;
+            stats.totalContributions = stats.contributions;
+            stats.heatmap = stats.contributionCalendar.heatmap;
           }
           updatedUser.contributionCalendar = stats.contributionCalendar;
+          updatedUser.totalContributions = stats.contributions;
+          updatedUser.heatmap = stats.contributionCalendar.heatmap || stats.heatmap || [];
+          updatedUser.stats.totalContributions = stats.contributions;
+          updatedUser.stats.heatmap = updatedUser.heatmap;
         }
 
         await updatedUser.save();
@@ -238,6 +243,8 @@ router.post('/connect/github', optionalAuth, async (req, res) => {
           userId,
           platform: 'github',
           handle: stats.username,
+          totalContributions: stats.contributions,
+          heatmap: stats.contributionCalendar?.heatmap || stats.heatmap || [],
           stats,
           lastSynced: new Date()
         },
@@ -269,6 +276,9 @@ router.post('/connect/github', optionalAuth, async (req, res) => {
 
     if (stats.contributionCalendar) {
       current.contributionCalendar = stats.contributionCalendar;
+      current.heatmap = stats.contributionCalendar.heatmap || stats.heatmap || [];
+      current.totalContributions = stats.contributions;
+      current.stats.heatmap = current.heatmap;
     }
 
     if (stats.repositories?.length) {

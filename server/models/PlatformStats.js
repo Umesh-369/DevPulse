@@ -17,6 +17,17 @@ const platformStatsSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    totalContributions: {
+      type: Number,
+      default: 0
+    },
+    heatmap: [
+      {
+        date: { type: String, required: true },
+        count: { type: Number, default: 0 },
+        level: { type: Number, default: 0 }
+      }
+    ],
     stats: {
       type: mongoose.Schema.Types.Mixed,
       default: {}

@@ -170,6 +170,8 @@ export async function fetchGitHubStats(username, accessToken = null) {
     totalStars,
     totalForks,
     contributions: contributionsCount,
+    totalContributions: contributionsCount,
+    heatmap: contributionCalendar?.heatmap || [],
     contributionCalendar,
     languageDistribution,
     repositories: formattedRepositories
@@ -178,8 +180,13 @@ export async function fetchGitHubStats(username, accessToken = null) {
 
 /**
  * Map contribution count to level 0-4
+ * Level 0: 0
+ * Level 1: 1-2
+ * Level 2: 3-5
+ * Level 3: 6-9
+ * Level 4: 10+
  */
-export function getContributionLevel(count) {
+export function calculateContributionLevel(count) {
   if (!count || count <= 0) return 0;
   if (count <= 2) return 1;
   if (count <= 5) return 2;
@@ -187,23 +194,27 @@ export function getContributionLevel(count) {
   return 4;
 }
 
+export const getContributionLevel = calculateContributionLevel;
+
 /**
  * Fetch real 365-day contribution calendar for a GitHub user.
- * Tries GitHub GraphQL first if accessToken is provided.
- * Automatically falls back to public contributions API without requiring OAuth tokens.
+ * 1. Primary: Authenticated GitHub GraphQL API using user's OAuth accessToken or process.env.GITHUB_TOKEN.
+ * 2. Fallback: Zero-token multi-source public API querying both y=last and y=2026.
+ * Normalizes into a flat array of 365+ objects: heatmap: [{ date: "YYYY-MM-DD", count: Number, level: Number }].
  * @param {string} username
  * @param {string} [accessToken]
- * @returns {Promise<{totalContributions: number, weeks: Array<{days: Array<{date: string, count: number, level: number, weekday: number}>}>, days: Array}>}
+ * @returns {Promise<{totalContributions: number, heatmap: Array<{date: string, count: number, level: number}>, weeks: Array, days: Array}>}
  */
 export async function fetchGitHubContributions(username, accessToken = null) {
   if (!username) {
-    return { totalContributions: 0, weeks: [], days: [] };
+    return { totalContributions: 0, heatmap: [], weeks: [], days: [] };
   }
 
   const cleanUsername = username.trim().replace(/^@/, '');
+  const token = accessToken || process.env.GITHUB_TOKEN;
 
-  // 1. Try GraphQL if accessToken is available
-  if (accessToken) {
+  // 1. Primary Fetcher: Authenticated GitHub GraphQL API
+  if (token) {
     try {
       const gqlQuery = `
         query($username: String!) {
@@ -215,7 +226,7 @@ export async function fetchGitHubContributions(username, accessToken = null) {
                   contributionDays {
                     date
                     contributionCount
-                    weekday
+                    contributionLevel
                   }
                 }
               }
@@ -229,7 +240,7 @@ export async function fetchGitHubContributions(username, accessToken = null) {
         { query: gqlQuery, variables: { username: cleanUsername } },
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             'User-Agent': 'DevPulse-Developer-Platform'
           },
           timeout: 10000
@@ -238,60 +249,110 @@ export async function fetchGitHubContributions(username, accessToken = null) {
 
       const calendar = gqlRes.data?.data?.user?.contributionsCollection?.contributionCalendar;
       if (calendar?.weeks?.length) {
+        const heatmap = [];
         const weeks = calendar.weeks.map(w => ({
-          days: (w.contributionDays || []).map(d => ({
-            date: d.date,
-            count: d.contributionCount || 0,
-            level: getContributionLevel(d.contributionCount || 0),
-            weekday: d.weekday
-          }))
+          days: (w.contributionDays || []).map(d => {
+            const count = d.contributionCount || 0;
+            const level = calculateContributionLevel(count);
+            const entry = {
+              date: d.date,
+              count,
+              level,
+              weekday: new Date(d.date + 'T00:00:00Z').getUTCDay()
+            };
+            heatmap.push({
+              date: d.date,
+              count,
+              level
+            });
+            return entry;
+          })
         }));
 
-        const days = weeks.flatMap(w => w.days);
-        const total = calendar.totalContributions ?? days.reduce((sum, d) => sum + d.count, 0);
+        const total = Number(calendar.totalContributions) || heatmap.reduce((sum, d) => sum + d.count, 0);
 
         return {
           totalContributions: total,
+          heatmap,
           weeks,
-          days
+          days: heatmap
         };
       }
     } catch (gqlErr) {
-      console.warn(`[GitHub GraphQL Contributions] Failed for @${cleanUsername}, falling back to public API:`, gqlErr.message);
+      console.warn(`[GitHub GraphQL Contributions] Failed for @${cleanUsername}, falling back to public multi-source:`, gqlErr.message);
     }
   }
 
-  // 2. Zero-token fallback: Public GitHub Contributions API
+  // 2. Fallback Public Fetcher (Zero-Token Multi-Source: y=last AND y=2026)
   try {
-    const publicUrl = `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(cleanUsername)}?y=last`;
-    const res = await axios.get(publicUrl, {
-      timeout: 12000,
-      headers: {
-        'User-Agent': 'DevPulse-Developer-Platform'
+    const [lastRes, y2026Res] = await Promise.allSettled([
+      axios.get(`https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(cleanUsername)}?y=last`, {
+        timeout: 10000,
+        headers: { 'User-Agent': 'DevPulse-Developer-Platform' }
+      }),
+      axios.get(`https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(cleanUsername)}?y=2026`, {
+        timeout: 10000,
+        headers: { 'User-Agent': 'DevPulse-Developer-Platform' }
+      })
+    ]);
+
+    const lastData = lastRes.status === 'fulfilled' ? lastRes.value.data : null;
+    const y2026Data = y2026Res.status === 'fulfilled' ? y2026Res.value.data : null;
+
+    const rawLast = Array.isArray(lastData?.contributions) ? lastData.contributions : [];
+    const raw2026 = Array.isArray(y2026Data?.contributions) ? y2026Data.contributions : [];
+
+    if (rawLast.length > 0 || raw2026.length > 0) {
+      // Map of date -> count taking maximum for each date across sources
+      const dateMap = new Map();
+
+      rawLast.forEach(item => {
+        if (!item?.date) return;
+        dateMap.set(item.date, item.count || 0);
+      });
+
+      raw2026.forEach(item => {
+        if (!item?.date) return;
+        const current = dateMap.get(item.date) || 0;
+        dateMap.set(item.date, Math.max(current, item.count || 0));
+      });
+
+      // Normalize into ordered array based on last-year sequence (starts on Sunday)
+      let heatmap = [];
+      if (rawLast.length > 0) {
+        heatmap = rawLast.map(item => {
+          const count = dateMap.get(item.date) ?? (item.count || 0);
+          return {
+            date: item.date,
+            count,
+            level: calculateContributionLevel(count)
+          };
+        });
+      } else {
+        const sortedDates = Array.from(dateMap.keys()).sort();
+        heatmap = sortedDates.map(date => {
+          const count = dateMap.get(date) || 0;
+          return {
+            date,
+            count,
+            level: calculateContributionLevel(count)
+          };
+        });
       }
-    });
 
-    const data = res.data;
-    const rawContributions = Array.isArray(data?.contributions) ? data.contributions : [];
-
-    if (rawContributions.length > 0) {
-      // Group the days into 7-day weeks (Sun-Sat)
+      // Group into 7-day Sunday-aligned weeks
       const weeks = [];
       let currentWeek = [];
 
-      for (let i = 0; i < rawContributions.length; i++) {
-        const item = rawContributions[i];
-        const dateObj = new Date(item.date + 'T00:00:00Z');
+      for (let i = 0; i < heatmap.length; i++) {
+        const entry = heatmap[i];
+        const dateObj = new Date(entry.date + 'T00:00:00Z');
         const weekday = isNaN(dateObj.getUTCDay()) ? (currentWeek.length % 7) : dateObj.getUTCDay();
 
-        const dayEntry = {
-          date: item.date,
-          count: item.count || 0,
-          level: typeof item.level === 'number' ? item.level : getContributionLevel(item.count || 0),
+        currentWeek.push({
+          ...entry,
           weekday
-        };
-
-        currentWeek.push(dayEntry);
+        });
 
         if (currentWeek.length === 7) {
           weeks.push({ days: currentWeek });
@@ -303,29 +364,30 @@ export async function fetchGitHubContributions(username, accessToken = null) {
         weeks.push({ days: currentWeek });
       }
 
-      const total = data.total?.lastYear ?? rawContributions.reduce((sum, d) => sum + (d.count || 0), 0);
+      // Total contribution count (honoring 2026 / lastYear total from API)
+      const reported2026 = Number(y2026Data?.total?.['2026']) || 0;
+      const reportedLast = Number(lastData?.total?.lastYear) || 0;
+      const sumCount = heatmap.reduce((sum, d) => sum + d.count, 0);
+      const totalContributions = Math.max(reported2026, reportedLast, sumCount);
 
       return {
-        totalContributions: total,
+        totalContributions,
+        heatmap,
         weeks,
-        days: rawContributions.map(d => ({
-          date: d.date,
-          count: d.count || 0,
-          level: d.level ?? getContributionLevel(d.count || 0)
-        }))
+        days: heatmap
       };
     }
   } catch (pubErr) {
-    console.warn(`[Public GitHub Contributions API] Failed for @${cleanUsername}:`, pubErr.message);
+    console.warn(`[Public Multi-Source Contributions API] Failed for @${cleanUsername}:`, pubErr.message);
   }
 
-  return { totalContributions: 0, weeks: [], days: [] };
+  return { totalContributions: 0, heatmap: [], weeks: [], days: [] };
 }
 
 /**
- * Merge LeetCode submissionCalendar into a contributionCalendar.
+ * Merge LeetCode submissionCalendar into contributionCalendar.
  * Adds problem submission counts by date and updates totalContributions and levels.
- * @param {object} calendarData - { totalContributions, weeks, days }
+ * @param {object} calendarData - { totalContributions, heatmap, weeks, days }
  * @param {object|string} leetcodeCalendar - map of unix timestamps (sec) -> count
  * @returns {object} updated calendarData
  */
@@ -357,7 +419,7 @@ export function mergeLeetCodeContributions(calendarData, leetcodeCalendar) {
         githubCount: ghCount,
         leetcodeCount: lcCount,
         count: combinedCount,
-        level: getContributionLevel(combinedCount)
+        level: calculateContributionLevel(combinedCount)
       };
     })
   }));
@@ -365,8 +427,19 @@ export function mergeLeetCodeContributions(calendarData, leetcodeCalendar) {
   const allDays = updatedWeeks.flatMap(w => w.days);
   const total = allDays.reduce((sum, d) => sum + (d.count || 0), 0);
 
+  const updatedHeatmap = (calendarData.heatmap || allDays).map(item => {
+    const lcCount = lcMap[item.date] || 0;
+    const combined = (item.count || 0) + lcCount;
+    return {
+      date: item.date,
+      count: combined,
+      level: calculateContributionLevel(combined)
+    };
+  });
+
   return {
     totalContributions: total,
+    heatmap: updatedHeatmap,
     weeks: updatedWeeks,
     days: allDays
   };

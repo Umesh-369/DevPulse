@@ -524,8 +524,9 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
   let userLangDist = req.app.locals.languageDistribution;
   let calendar = req.app.locals.currentUser?.contributionCalendar || null;
 
+  let dbUser = null;
   if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
-    const dbUser = await User.findById(userId);
+    dbUser = await User.findById(userId);
     if (dbUser?.stats) stats = dbUser.stats;
 
     const ghStats = await PlatformStats.findOne({ userId, platform: 'github' });
@@ -534,9 +535,11 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
     }
 
     calendar = dbUser?.contributionCalendar || ghStats?.stats?.contributionCalendar || null;
+    let heatmap = calendar?.heatmap || dbUser?.heatmap || [];
+    let totalContrib = calendar?.totalContributions ?? dbUser?.totalContributions ?? stats?.totalContributions ?? 0;
 
-    // If no calendar stored yet but user has connected GitHub, auto-fetch real 365-day calendar now
-    if ((!calendar || !calendar.weeks?.length) && (dbUser?.connectedPlatforms?.github?.handle || dbUser?.github?.username)) {
+    // If no calendar/heatmap stored yet but user has connected GitHub, auto-fetch real 365-day calendar now
+    if ((!heatmap.length || totalContrib === 0) && (dbUser?.connectedPlatforms?.github?.handle || dbUser?.github?.username)) {
       try {
         const ghHandle = dbUser.connectedPlatforms?.github?.handle || dbUser.github?.username;
         const freshGhStats = await fetchGitHubStats(ghHandle, dbUser.github?.accessToken);
@@ -546,8 +549,13 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
           if (lcStats?.stats?.submissionCalendar) {
             calendar = mergeLeetCodeContributions(calendar, lcStats.stats.submissionCalendar);
           }
+          heatmap = calendar.heatmap || freshGhStats.heatmap || [];
+          totalContrib = calendar.totalContributions || freshGhStats.totalContributions || 0;
           dbUser.contributionCalendar = calendar;
-          dbUser.stats.totalContributions = calendar.totalContributions;
+          dbUser.heatmap = heatmap;
+          dbUser.totalContributions = totalContrib;
+          dbUser.stats.totalContributions = totalContrib;
+          dbUser.stats.heatmap = heatmap;
           await dbUser.save();
         }
       } catch (calErr) {
@@ -556,10 +564,19 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
     }
   }
 
+  const finalHeatmap = calendar?.heatmap || dbUser?.heatmap || req.app.locals.currentUser?.heatmap || [];
+  const finalTotal = calendar?.totalContributions ?? dbUser?.totalContributions ?? stats?.totalContributions ?? 0;
+
   return res.json({
     success: true,
     timeframe,
-    stats,
+    stats: {
+      ...stats,
+      totalContributions: finalTotal,
+      heatmap: finalHeatmap
+    },
+    totalContributions: finalTotal,
+    heatmap: finalHeatmap,
     languageDistribution: userLangDist,
     problemSolvingTrend,
     platformBarChart: req.app.locals.platformBarChart,
@@ -608,6 +625,8 @@ app.post('/api/stats/sync', optionalAuth, async (req, res) => {
         lcData.submissionCalendar
       );
       ghStats.contributions = ghStats.contributionCalendar.totalContributions;
+      ghStats.totalContributions = ghStats.contributions;
+      ghStats.heatmap = ghStats.contributionCalendar.heatmap;
     }
 
     // Persist updates to DB if available
@@ -625,9 +644,26 @@ app.post('/api/stats/sync', optionalAuth, async (req, res) => {
         dbUser.stats.totalContributions = ghStats.contributions;
         dbUser.stats.followers = ghStats.followers;
         dbUser.stats.following = ghStats.following;
+        dbUser.totalContributions = ghStats.contributions;
+        dbUser.heatmap = ghStats.heatmap || [];
+        dbUser.stats.heatmap = dbUser.heatmap;
         if (ghStats.contributionCalendar) {
           dbUser.contributionCalendar = ghStats.contributionCalendar;
         }
+
+        await PlatformStats.findOneAndUpdate(
+          { userId, platform: 'github' },
+          {
+            userId,
+            platform: 'github',
+            handle: ghStats.username,
+            totalContributions: ghStats.contributions,
+            heatmap: ghStats.heatmap || [],
+            stats: ghStats,
+            lastSynced: new Date()
+          },
+          { upsert: true, new: true }
+        );
       }
 
       if (lcData) {
@@ -675,6 +711,9 @@ app.post('/api/stats/sync', optionalAuth, async (req, res) => {
       };
       current.stats.totalRepositories = ghStats.publicRepos;
       current.stats.totalContributions = ghStats.contributions;
+      current.totalContributions = ghStats.contributions;
+      current.heatmap = ghStats.heatmap || [];
+      current.stats.heatmap = ghStats.heatmap || [];
       if (ghStats.contributionCalendar) {
         current.contributionCalendar = ghStats.contributionCalendar;
       }
@@ -699,12 +738,15 @@ app.post('/api/stats/sync', optionalAuth, async (req, res) => {
     }
     req.app.locals.currentUser = current;
 
+    const finalUser = dbUser || current;
     return res.json({
       success: true,
       message: 'All platform statistics and contribution calendar synchronized successfully',
-      user: dbUser || current,
-      stats: (dbUser || current).stats,
-      contributionCalendar: (dbUser || current).contributionCalendar
+      user: finalUser,
+      stats: finalUser.stats,
+      totalContributions: finalUser.totalContributions || finalUser.stats?.totalContributions || 0,
+      heatmap: finalUser.heatmap || finalUser.stats?.heatmap || [],
+      contributionCalendar: finalUser.contributionCalendar
     });
   } catch (err) {
     console.error('POST /api/stats/sync error:', err.message);

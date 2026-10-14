@@ -147,11 +147,29 @@ const userSchema = new mongoose.Schema(
       leetcodeProblems: { type: Number, default: 0 },
       acceptanceRate: { type: Number, default: 0 },
       activeDays: { type: Number, default: 0 },
-      pullRequests: { type: Number, default: 0 }
+      pullRequests: { type: Number, default: 0 },
+      heatmap: [
+        {
+          date: { type: String, required: true },
+          count: { type: Number, default: 0 },
+          level: { type: Number, default: 0 }
+        }
+      ]
     },
+    totalContributions: {
+      type: Number,
+      default: 0
+    },
+    heatmap: [
+      {
+        date: { type: String, required: true },
+        count: { type: Number, default: 0 },
+        level: { type: Number, default: 0 }
+      }
+    ],
     contributionCalendar: {
       type: mongoose.Schema.Types.Mixed,
-      default: { totalContributions: 0, weeks: [], days: [] }
+      default: { totalContributions: 0, weeks: [], days: [], heatmap: [] }
     },
     connectedPlatforms: {
       github: {
