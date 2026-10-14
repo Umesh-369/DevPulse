@@ -18,9 +18,17 @@ A full-stack, enterprise-grade developer telemetry and intelligence hub that agg
 
 <br/>
 
+[![Supported Platforms](https://img.shields.io/badge/Platforms-LeetCode%20%7C%20GitHub%20%7C%20CodeChef%20%7C%20HackerRank%20%7C%20GFG%20%7C%20AtCoder-FF8800?style=flat-square&logo=google-chrome&logoColor=white)](https://github.com/Umesh-369/DevPulse)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/Umesh-369/DevPulse/pulls)
+[![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://prettier.io)
+
+<br/>
+
 [Explore Live Demo](http://localhost:5173) • [Report Bug](https://github.com/Umesh-369/DevPulse/issues) • [Request Feature](https://github.com/Umesh-369/DevPulse/issues)
 
 <br/>
+
+### 🖥️ Pixel-Accurate Dual Theme Previews
 
 <table>
   <tr>
@@ -32,8 +40,25 @@ A full-stack, enterprise-grade developer telemetry and intelligence hub that agg
     <td><img src="./docs/images/mockup-hero-light.png" alt="DevPulse Light Mode Mockup" width="460" /></td>
   </tr>
   <tr>
+    <td align="center"><b>💼 Verified Developer Profile (Dark)</b></td>
+    <td align="center"><b>💼 Verified Developer Profile (Light)</b></td>
+  </tr>
+  <tr>
     <td><img src="./docs/images/mockup-profile-dark.png" alt="DevPulse Profile Dark" width="460" /></td>
     <td><img src="./docs/images/mockup-profile-light.png" alt="DevPulse Profile Light" width="460" /></td>
+  </tr>
+</table>
+
+<br/>
+
+<table>
+  <tr>
+    <td align="center"><b>🌌 Opportunity Cosmic Banner</b></td>
+    <td align="center"><b>🏔️ Mountain Spire Auth Experience</b></td>
+  </tr>
+  <tr>
+    <td><img src="./docs/images/opportunity-cosmic.jpg" alt="Opportunity Cosmic Banner" width="460" /></td>
+    <td><img src="./docs/images/mountain-spire.jpg" alt="Mountain Spire Visual" width="460" /></td>
   </tr>
 </table>
 
@@ -55,11 +80,15 @@ A full-stack, enterprise-grade developer telemetry and intelligence hub that agg
   - [8. Developer Utility Suite (Problems, Repos, Goals, ⌘K)](#8-developer-utility-suite)
 - [System Architecture](#-system-architecture)
 - [Rating & Ranking Algorithm](#-rating--ranking-algorithm)
+- [Database Schema & Data Models](#-database-schema--data-models)
+- [Keyboard Navigation & Command Palette](#-keyboard-navigation--command-palette)
 - [Technology Stack](#-technology-stack)
+- [Security & Compliance](#-security--compliance)
 - [Repository Structure](#-repository-structure)
 - [REST API Specification](#-rest-api-specification)
 - [Getting Started & Installation](#-getting-started--installation)
 - [Environment Variables](#-environment-variables)
+- [Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
 - [Project Roadmap](#-project-roadmap)
 - [Contributing](#-contributing)
 - [License & Author](#-license--author)
@@ -222,6 +251,65 @@ $$\text{DevRating} = (8 \times E) + (18 \times M) + (35 \times H) + \min(S \time
 
 ---
 
+## 🗄 Database Schema & Data Models
+
+DevPulse leverages typed Mongoose schemas designed for sub-millisecond retrieval and robust relational linkages:
+
+### 1. `User` Schema
+```typescript
+interface IUser {
+  name: string;
+  email: string;
+  password?: string;               // Bcrypt hash
+  avatar?: string;
+  role: string;                    // e.g. "Full Stack Engineer"
+  college?: string;
+  bio?: string;
+  targetRole?: string;
+  theme: 'dark' | 'light';
+  connectedPlatforms: {
+    github?: { handle: string; connected: boolean; verified: boolean; lastSynced: Date };
+    leetcode?: { handle: string; connected: boolean; solved: number; easy: number; medium: number; hard: number };
+    codechef?: { handle: string; rating: number };
+    hackerrank?: { handle: string };
+    gfg?: { handle: string; score: number };
+    atcoder?: { handle: string; rating: number };
+  };
+  stats: {
+    problemsSolved: number;
+    currentStreak: number;
+    totalRepositories: number;
+    rating: number;
+  };
+  projects: Array<IProject>;
+  openRouterApiKey?: string;
+}
+```
+
+### 2. `PlatformStats` Schema
+Captures raw, platform-specific JSON payloads to permit decoupled offline caching and historical charting without re-requesting upstream APIs.
+
+### 3. `AIReport` Schema
+Stores historical snapshots of the OpenRouter LLM career evaluations, including skill radar dimension scores, recommended action checklists, and interactive task states.
+
+---
+
+## ⌨️ Keyboard Navigation & Command Palette
+
+Press **`Ctrl + K`** (Windows / Linux) or **`⌘ + K`** (macOS) from anywhere in the application:
+
+| Shortcut | Action | Destination |
+| :--- | :--- | :--- |
+| `Ctrl + K` $\rightarrow$ `D` | Open Unified Dashboard | `/dashboard` |
+| `Ctrl + K` $\rightarrow$ `P` | Open Developer Portfolio | `/portfolio` |
+| `Ctrl + K` $\rightarrow$ `A` | Open Growth Analytics | `/analytics` |
+| `Ctrl + K` $\rightarrow$ `L` | Open Leaderboard | `/leaderboard` |
+| `Ctrl + K` $\rightarrow$ `I` | Open AI Career Insights | `/ai-insights` |
+| `Ctrl + K` $\rightarrow$ `T` | Toggle Dark / Light Theme | Instant |
+| `Esc` | Close Active Modal / Palette | — |
+
+---
+
 ## 🛠 Technology Stack
 
 ### Frontend Architecture
@@ -250,6 +338,17 @@ $$\text{DevRating} = (8 \times E) + (18 \times M) + (35 \times H) + \min(S \time
 
 ---
 
+## 🔒 Security & Compliance
+
+DevPulse follows enterprise best practices to safeguard user data:
+- **Zero Credentials Policy:** DevPulse **never** requests or stores passwords for connected external platforms (LeetCode, GitHub, etc.). We rely solely on public GraphQL APIs or verified OAuth 2.0 authorization grants.
+- **Salted Password Hashing:** User passwords are encrypted using `bcryptjs` with salt rounds ($10$), preventing rainbow table lookups.
+- **Stateless JWT Tokens:** Authentication sessions use signed JSON Web Tokens passed via Authorization headers.
+- **Environment Isolation:** All sensitive credentials, database connection strings, and OAuth client secrets are strictly quarantined in `.env` and kept out of version control via comprehensive `.gitignore` rules.
+- **Graceful Fault Tolerance:** Built-in in-memory fallbacks ensure smooth operation even during temporary MongoDB Atlas maintenance or external platform rate limits.
+
+---
+
 ## 📂 Repository Structure
 
 ```text
@@ -264,7 +363,9 @@ DevPulse/
 │       ├── mockup-hero-dark.png
 │       ├── mockup-hero-light.png
 │       ├── mockup-profile-dark.png
-│       └── mockup-profile-light.png
+│       ├── mockup-profile-light.png
+│       ├── mountain-spire.jpg
+│       └── opportunity-cosmic.jpg
 ├── client/                      # React 19 Frontend Application
 │   ├── index.html               # Single page entry HTML
 │   ├── package.json             # Client dependencies & scripts
@@ -425,6 +526,34 @@ Open your browser at **`http://localhost:5173`** to explore DevPulse!
 | `GITHUB_CLIENT_SECRET` | Optional | `your_secret` | GitHub OAuth application secret key |
 | `GOOGLE_CLIENT_ID` | Optional | `your_google_id` | Google Cloud OAuth 2.0 Client ID |
 | `GOOGLE_CLIENT_SECRET` | Optional | `your_google_secret`| Google Cloud OAuth 2.0 Client Secret |
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>1. Do I need to enter my passwords for LeetCode or GitHub?</b></summary>
+<br/>
+<b>Never.</b> DevPulse only needs your public usernames or authorized OAuth 2.0 grants. We never ask for, transmit, or store your external account passwords.
+</details>
+
+<details>
+<summary><b>2. Can I use DevPulse if my MongoDB Atlas cluster is offline?</b></summary>
+<br/>
+Yes! DevPulse is built with an intelligent in-memory fallback layer in <code>server.js</code>. If a database connection is absent, the backend gracefully runs in development mode without crashing.
+</details>
+
+<details>
+<summary><b>3. How is the AI Career Coach customized to my profile?</b></summary>
+<br/>
+The backend extracts your active coding telemetry (solved problem difficulties, GitHub language distribution, repositories, and active streaks) and feeds them into a specialized prompt sent to OpenRouter (GPT-4o-mini). It generates tailored recommendations and a dynamic 7-day checklist roadmap.
+</details>
+
+<details>
+<summary><b>4. How does the College & Friends Leaderboard work?</b></summary>
+<br/>
+The leaderboard queries registered users from MongoDB, computes their normalized <b>DevPulse Rating</b> using verified telemetry, and automatically highlights your rank with a distinctive <code>YOU</code> badge. You can toggle between <b>Global</b>, <b>My College</b>, and <b>Friends</b>.
+</details>
 
 ---
 
