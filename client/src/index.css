@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #FAF8F5;
+    --bg-card: #FFFFFF;
+    --border-card: #EAE6DF;
+    --text-primary: #111315;
+    --text-secondary: #6B7280;
+    --accent-gold: #C58B43;
+    --accent-emerald: #10B981;
+    --btn-primary-bg: #111315;
+    --btn-primary-text: #FFFFFF;
+  }
+
+  .dark {
+    --bg-primary: #0B0D11;
+    --bg-card: #151922;
+    --border-card: rgba(255, 255, 255, 0.08);
+    --text-primary: #F3F4F6;
+    --text-secondary: #9CA3AF;
+    --accent-gold: #E5A952;
+    --accent-emerald: #10B981;
+    --btn-primary-bg: #E5A952;
+    --btn-primary-text: #0B0D11;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(229, 169, 82, 0.5);
+}
+
+/* Typography Helpers */
+.font-editorial {
+  font-family: 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+}
+
+.font-impact {
+  font-family: 'Plus Jakarta Sans', 'Syne', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+/* Gold Gradient Text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #E5A952 0%, #DFA048 50%, #C58B43 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gold-light-gradient {
+  background: linear-gradient(135deg, #B4732A 0%, #C58B43 50%, #945C1A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #EAE6DF;
+}
+
+.glass-panel-dark {
+  background: rgba(21, 25, 34, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 3D Perspective Card Tilt */
+.perspective-container {
+  perspective: 1200px;
+}
+
+.laptop-3d-tilt {
+  transform: rotateX(12deg) rotateY(-8deg) rotateZ(2deg);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  transform-style: preserve-3d;
+}
+
+.laptop-3d-tilt:hover {
+  transform: rotateX(6deg) rotateY(-3deg) rotateZ(1deg) scale(1.02);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
+
+/* Custom Floating & Pulse Animations */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 6s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
