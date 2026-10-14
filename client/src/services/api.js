@@ -24,12 +24,16 @@ async function fetchWithFallback(url, options = {}, fallbackData) {
       ...(options.headers || {})
     };
 
-    // If url starts with /api, use relative (for Vite proxy) or fallback to API_BASE
-    const fetchUrl = url.startsWith('http') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
+    // If url starts with http/https, use as-is; otherwise prefix with API_BASE
+    const baseUrl = (API_BASE || '').replace(/\/+$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    const apiPath = path.startsWith('/api') ? path : `/api${path}`;
+    const fetchUrl = url.startsWith('http') ? url : `${baseUrl}${apiPath}`;
 
     const res = await fetch(fetchUrl, {
       ...options,
-      headers
+      headers,
+      credentials: options.credentials || 'include'
     });
 
     const data = await res.json().catch(() => ({}));

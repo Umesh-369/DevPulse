@@ -10,21 +10,31 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const getClientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173';
-const getServerUrl = () => process.env.SERVER_URL || 'http://localhost:5000';
+const getClientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+const getServerUrl = () => (process.env.SERVER_URL || 'http://localhost:5000').replace(/\/+$/, '');
 const getJwtSecret = () => process.env.JWT_SECRET || 'devpulse_super_secret_jwt_key_2026';
 
 const getGoogleCredentials = () => {
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.Cliend_Id;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.Client_secret;
-  const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${getServerUrl()}/api/auth/google/callback`;
+  const serverUrl = getServerUrl();
+  const envCallback = process.env.GOOGLE_CALLBACK_URL;
+  // Use process.env.SERVER_URL to form the callback URL, unless explicit non-localhost callback URL is supplied
+  const callbackUrl = (envCallback && (!serverUrl.startsWith('https://') || envCallback.startsWith('https://')))
+    ? envCallback
+    : `${serverUrl}/api/auth/google/callback`;
   return { clientId, clientSecret, callbackUrl };
 };
 
 const getGithubCredentials = () => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-  const callbackUrl = process.env.GITHUB_CALLBACK_URL || `${getServerUrl()}/api/auth/github/callback`;
+  const serverUrl = getServerUrl();
+  const envCallback = process.env.GITHUB_CALLBACK_URL;
+  // Use process.env.SERVER_URL to form the callback URL, unless explicit non-localhost callback URL is supplied
+  const callbackUrl = (envCallback && (!serverUrl.startsWith('https://') || envCallback.startsWith('https://')))
+    ? envCallback
+    : `${serverUrl}/api/auth/github/callback`;
   return { clientId, clientSecret, callbackUrl };
 };
 

@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { GitHubIcon } from '../components/common/PlatformIcons';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const LANGUAGE_COLORS = {
   JavaScript: '#F7DF1E',
   TypeScript: '#3178C6',
@@ -396,7 +398,7 @@ export default function RepositoriesPage() {
 
               <div className="pt-2">
                 <a
-                  href="http://localhost:5000/api/auth/github"
+                  href={`${API_URL}/api/auth/github`}
                   className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-500 transition-colors"
                 >
                   <GitHubIcon className="w-4 h-4" />

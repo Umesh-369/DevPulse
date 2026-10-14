@@ -36,13 +36,36 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const clientUrls = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map(url => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  process.env.CLIENT_URL,
+  ...clientUrls
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    process.env.CLIENT_URL || 'http://localhost:5173'
-  ],
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. curl, Postman, server-to-server, Render health checks)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.replace(/\/+$/, '');
+    if (
+      allowedOrigins.includes(origin) ||
+      allowedOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith('.vercel.app') ||
+      allowedOrigins.some(ao => ao && ao.toLowerCase() === cleanOrigin.toLowerCase())
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(null, true);
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -583,14 +606,18 @@ app.post('/api/goals', (req, res) => {
   return res.status(201).json({ success: true, goal: newGoal });
 });
 
-// Health check
+// Health check (Render & uptime monitoring)
 app.get('/api/health', (req, res) => {
-  return res.json({
-    status: 'online',
+  return res.status(200).json({
+    status: 'ok',
     appName: 'DevPulse API',
     mongoConnected: getDBStatus(),
     version: '1.0.0'
   });
+});
+
+app.get('/health', (req, res) => {
+  return res.status(200).json({ status: 'ok' });
 });
 
 // Start Server
