@@ -12,7 +12,12 @@ import {
   sampleGoalsData
 } from './mockData';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : 'https://devpulse-mf1t.onrender.com');
 
 // Safe fetch wrapper with auth header and automatic fallback
 async function fetchWithFallback(url, options = {}, fallbackData) {
@@ -99,6 +104,14 @@ export const api = {
     },
     getStats: async () => {
       return fetchWithFallback('/platforms/stats', {}, { success: true, stats: [] });
+    },
+    sync: async () => {
+      return fetchWithFallback('/stats/sync', { method: 'POST' });
+    }
+  },
+  stats: {
+    sync: async () => {
+      return fetchWithFallback('/stats/sync', { method: 'POST' });
     }
   },
   user: {

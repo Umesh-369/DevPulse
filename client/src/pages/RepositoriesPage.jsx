@@ -3,7 +3,7 @@ import Sidebar from '../components/layout/Sidebar';
 import HeaderBar from '../components/layout/HeaderBar';
 import CommandSearchModal from '../components/layout/CommandSearchModal';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
+import { api, API_BASE } from '../services/api';
 import confetti from 'canvas-confetti';
 import {
   GitBranch,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { GitHubIcon } from '../components/common/PlatformIcons';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE;
 
 const LANGUAGE_COLORS = {
   JavaScript: '#F7DF1E',

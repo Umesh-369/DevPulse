@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { Repository } from '../models/Repository.js';
 import { User } from '../models/User.js';
 import { PlatformStats } from '../models/PlatformStats.js';
-import { fetchGitHubStats } from '../services/githubService.js';
+import { fetchGitHubStats, mergeLeetCodeContributions } from '../services/githubService.js';
 import { optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -190,6 +190,18 @@ router.post('/sync', optionalAuth, async (req, res) => {
         if (!dbUser.githubUrl) {
           dbUser.githubUrl = `https://github.com/${cleanUsername}`;
         }
+        if (ghStats.contributionCalendar) {
+          const lcStats = await PlatformStats.findOne({ userId, platform: 'leetcode' });
+          if (lcStats?.stats?.submissionCalendar) {
+            ghStats.contributionCalendar = mergeLeetCodeContributions(
+              ghStats.contributionCalendar,
+              lcStats.stats.submissionCalendar
+            );
+            ghStats.contributions = ghStats.contributionCalendar.totalContributions;
+            dbUser.stats.totalContributions = ghStats.contributions;
+          }
+          dbUser.contributionCalendar = ghStats.contributionCalendar;
+        }
         await dbUser.save();
       }
 
@@ -209,6 +221,10 @@ router.post('/sync', optionalAuth, async (req, res) => {
     } else {
       req.app.locals.repositories = ghStats.repositories;
       savedRepos = ghStats.repositories;
+      if (ghStats.contributionCalendar) {
+        req.app.locals.currentUser.contributionCalendar = ghStats.contributionCalendar;
+        req.app.locals.currentUser.stats.totalContributions = ghStats.contributions;
+      }
     }
 
     return res.json({

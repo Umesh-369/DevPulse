@@ -73,6 +73,19 @@ export async function purgeMockData() {
       console.log(`✓ Deleted ${handleDelResult.deletedCount} demo platformstats by seed handle.`);
     }
 
+    // Also purge hardcoded fallback problems ('Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses')
+    const fallbackProblemTitles = ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'];
+    const problemDelResult = await db.collection('problems').deleteMany({
+      $or: [
+        { problemId: { $in: ['p1', 'p2', 'p3', 'p4'] } },
+        { title: { $in: fallbackProblemTitles }, isCustom: { $ne: true } },
+        { title: { $in: fallbackProblemTitles }, userId: null }
+      ]
+    });
+    if (problemDelResult.deletedCount > 0) {
+      console.log(`✓ Deleted ${problemDelResult.deletedCount} hardcoded fallback problems.`);
+    }
+
     // 2. Clean up real users: remove hardcoded Vishnu default and calculate real rating
     const realUsers = await db.collection('users').find({}).toArray();
     for (const rUser of realUsers) {

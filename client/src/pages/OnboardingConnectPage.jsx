@@ -21,8 +21,9 @@ import {
   GeeksforGeeksIcon,
   AtCoderIcon
 } from '../components/common/PlatformIcons';
+import { API_BASE } from '../services/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE;
 
 export default function OnboardingConnectPage() {
   const { user, connectPlatform } = useAuth();

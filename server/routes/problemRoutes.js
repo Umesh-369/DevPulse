@@ -4,6 +4,7 @@ import { Problem } from '../models/Problem.js';
 import { User } from '../models/User.js';
 import { PlatformStats } from '../models/PlatformStats.js';
 import { fetchLeetCodeStats, formatRelativeTime } from '../services/leetcodeService.js';
+import { mergeLeetCodeContributions } from '../services/githubService.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { calculateRating } from '../utils/rating.js';
 
@@ -36,7 +37,18 @@ router.get('/', optionalAuth, async (req, res) => {
         stats.hardSolved = lcPlatform?.hardSolved || 0;
       }
 
-      let query = { userId };
+      let query = {
+        userId,
+        $and: [
+          {
+            $or: [
+              { title: { $nin: ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'] } },
+              { isCustom: true }
+            ]
+          },
+          { problemId: { $nin: ['p1', 'p2', 'p3', 'p4'] } }
+        ]
+      };
       if (difficulty && difficulty !== 'All') {
         query.difficulty = new RegExp(`^${difficulty}$`, 'i');
       }
@@ -103,8 +115,11 @@ router.get('/', optionalAuth, async (req, res) => {
       stats.hardSolved = lc?.hardSolved || problems.filter(p => p.difficulty === 'Hard').length;
     }
 
+    const fallbackTitles = ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'];
+    const cleanList = problems.filter(p => !fallbackTitles.includes(p.title) || p.isCustom);
+
     // Format relative time for all problems
-    const formattedProblems = problems.map(p => ({
+    const formattedProblems = cleanList.map(p => ({
       ...p,
       id: p._id ? String(p._id) : (p.id || p.problemId),
       date: formatRelativeTime(p.solvedAt || p.timestamp || p.createdAt),
@@ -223,6 +238,15 @@ router.post('/sync', optionalAuth, async (req, res) => {
         dbUser.stats.activeDays = lcData.activeDays;
         dbUser.stats.currentStreak = lcData.currentStreak;
         dbUser.stats.rating = dynamicRating;
+
+        if (dbUser.contributionCalendar && lcData.submissionCalendar) {
+          dbUser.contributionCalendar = mergeLeetCodeContributions(
+            dbUser.contributionCalendar,
+            lcData.submissionCalendar
+          );
+          dbUser.stats.totalContributions = dbUser.contributionCalendar.totalContributions;
+        }
+
         await dbUser.save();
 
         await PlatformStats.findOneAndUpdate(
@@ -238,13 +262,26 @@ router.post('/sync', optionalAuth, async (req, res) => {
         );
       }
 
-      savedProblems = await Problem.find({ userId }).sort({ solvedAt: -1 }).lean();
+      savedProblems = await Problem.find({
+        userId,
+        $or: [
+          { title: { $nin: ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'] } },
+          { isCustom: true }
+        ]
+      }).sort({ solvedAt: -1 }).lean();
     } else {
       // In-memory fallback
       req.app.locals.problems = recentList;
       savedProblems = recentList;
 
       const current = req.app.locals.currentUser;
+      if (current.contributionCalendar && lcData.submissionCalendar) {
+        current.contributionCalendar = mergeLeetCodeContributions(
+          current.contributionCalendar,
+          lcData.submissionCalendar
+        );
+        current.stats.totalContributions = current.contributionCalendar.totalContributions;
+      }
       current.connectedPlatforms.leetcode = {
         connected: true,
         handle: lcData.username,

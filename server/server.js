@@ -13,6 +13,8 @@ import { optionalAuth, requireAuth } from './middleware/auth.js';
 import { User } from './models/User.js';
 import { PlatformStats } from './models/PlatformStats.js';
 import { purgeMockData } from './scripts/cleanupDatabase.js';
+import { fetchGitHubStats, fetchGitHubContributions, mergeLeetCodeContributions } from './services/githubService.js';
+import { fetchLeetCodeStats } from './services/leetcodeService.js';
 import {
   initialUser,
   initialProjects,
@@ -187,6 +189,43 @@ app.post('/api/user/connect-platform', optionalAuth, async (req, res) => {
   }
 
   const pKey = platform.toLowerCase();
+  const userId = req.user?._id || req.user?.id;
+
+  if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
+    const dbUser = await User.findById(userId);
+    if (dbUser) {
+      dbUser.connectedPlatforms[pKey] = {
+        ...(dbUser.connectedPlatforms?.[pKey] || {}),
+        connected: true,
+        handle,
+        verified: true,
+        lastSynced: new Date()
+      };
+
+      if (pKey === 'github') {
+        try {
+          const ghStats = await fetchGitHubStats(handle, dbUser.github?.accessToken);
+          if (ghStats?.contributionCalendar) {
+            dbUser.contributionCalendar = ghStats.contributionCalendar;
+            dbUser.stats.totalContributions = ghStats.contributions;
+            dbUser.stats.totalRepositories = ghStats.publicRepos;
+          }
+        } catch (e) {
+          console.warn('Connect platform dbUser github stats warning:', e.message);
+        }
+      }
+
+      await dbUser.save();
+      return res.json({
+        success: true,
+        message: `Connected ${platform} successfully for @${handle}`,
+        connectedPlatforms: dbUser.connectedPlatforms,
+        stats: dbUser.stats,
+        user: dbUser
+      });
+    }
+  }
+
   const current = req.app.locals.currentUser;
   const currentPlatform = current.connectedPlatforms?.[pKey] || {};
 
@@ -197,6 +236,19 @@ app.post('/api/user/connect-platform', optionalAuth, async (req, res) => {
     verified: true,
     lastSynced: new Date().toISOString()
   };
+
+  if (pKey === 'github') {
+    try {
+      const ghStats = await fetchGitHubStats(handle);
+      if (ghStats?.contributionCalendar) {
+        current.contributionCalendar = ghStats.contributionCalendar;
+        current.stats.totalContributions = ghStats.contributions;
+        current.stats.totalRepositories = ghStats.publicRepos;
+      }
+    } catch (e) {
+      console.warn('Connect platform current user github stats warning:', e.message);
+    }
+  }
 
   req.app.locals.currentUser = current;
 
@@ -470,6 +522,7 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
   const userId = req.user?._id || req.user?.id;
   let stats = req.app.locals.currentUser.stats;
   let userLangDist = req.app.locals.languageDistribution;
+  let calendar = req.app.locals.currentUser?.contributionCalendar || null;
 
   if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
     const dbUser = await User.findById(userId);
@@ -478,6 +531,28 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
     const ghStats = await PlatformStats.findOne({ userId, platform: 'github' });
     if (ghStats?.stats?.languageDistribution?.length) {
       userLangDist = ghStats.stats.languageDistribution;
+    }
+
+    calendar = dbUser?.contributionCalendar || ghStats?.stats?.contributionCalendar || null;
+
+    // If no calendar stored yet but user has connected GitHub, auto-fetch real 365-day calendar now
+    if ((!calendar || !calendar.weeks?.length) && (dbUser?.connectedPlatforms?.github?.handle || dbUser?.github?.username)) {
+      try {
+        const ghHandle = dbUser.connectedPlatforms?.github?.handle || dbUser.github?.username;
+        const freshGhStats = await fetchGitHubStats(ghHandle, dbUser.github?.accessToken);
+        if (freshGhStats?.contributionCalendar) {
+          calendar = freshGhStats.contributionCalendar;
+          const lcStats = await PlatformStats.findOne({ userId, platform: 'leetcode' });
+          if (lcStats?.stats?.submissionCalendar) {
+            calendar = mergeLeetCodeContributions(calendar, lcStats.stats.submissionCalendar);
+          }
+          dbUser.contributionCalendar = calendar;
+          dbUser.stats.totalContributions = calendar.totalContributions;
+          await dbUser.save();
+        }
+      } catch (calErr) {
+        console.warn('Auto-fetch contributions notice in /api/analytics:', calErr.message);
+      }
     }
   }
 
@@ -488,8 +563,153 @@ app.get('/api/analytics', optionalAuth, async (req, res) => {
     languageDistribution: userLangDist,
     problemSolvingTrend,
     platformBarChart: req.app.locals.platformBarChart,
-    achievements: achievementsList
+    achievements: achievementsList,
+    contributionCalendar: calendar
   });
+});
+
+// --- STATS SYNC ROUTE (POST /api/stats/sync) ---
+app.post('/api/stats/sync', optionalAuth, async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    let dbUser = null;
+    if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
+      dbUser = await User.findById(userId);
+    }
+    const current = req.app.locals.currentUser;
+
+    const ghHandle = dbUser?.connectedPlatforms?.github?.handle || dbUser?.github?.username || current?.connectedPlatforms?.github?.handle;
+    const lcHandle = dbUser?.connectedPlatforms?.leetcode?.handle || current?.connectedPlatforms?.leetcode?.handle;
+    const ghToken = dbUser?.github?.accessToken;
+
+    let ghStats = null;
+    let lcData = null;
+
+    if (ghHandle) {
+      try {
+        ghStats = await fetchGitHubStats(ghHandle, ghToken);
+      } catch (e) {
+        console.warn('Sync GitHub in /api/stats/sync warning:', e.message);
+      }
+    }
+
+    if (lcHandle) {
+      try {
+        lcData = await fetchLeetCodeStats(lcHandle);
+      } catch (e) {
+        console.warn('Sync LeetCode in /api/stats/sync warning:', e.message);
+      }
+    }
+
+    // Merge contributions if both available
+    if (ghStats?.contributionCalendar && lcData?.submissionCalendar) {
+      ghStats.contributionCalendar = mergeLeetCodeContributions(
+        ghStats.contributionCalendar,
+        lcData.submissionCalendar
+      );
+      ghStats.contributions = ghStats.contributionCalendar.totalContributions;
+    }
+
+    // Persist updates to DB if available
+    if (dbUser) {
+      if (ghStats) {
+        dbUser.connectedPlatforms.github = {
+          connected: true,
+          handle: ghStats.username,
+          verified: true,
+          contributions: ghStats.contributions,
+          repos: ghStats.publicRepos,
+          lastSynced: new Date()
+        };
+        dbUser.stats.totalRepositories = ghStats.publicRepos;
+        dbUser.stats.totalContributions = ghStats.contributions;
+        dbUser.stats.followers = ghStats.followers;
+        dbUser.stats.following = ghStats.following;
+        if (ghStats.contributionCalendar) {
+          dbUser.contributionCalendar = ghStats.contributionCalendar;
+        }
+      }
+
+      if (lcData) {
+        const dynamicRating = lcData.reputation || calculateRating({
+          problemsSolved: lcData.solved,
+          easySolved: lcData.easySolved,
+          mediumSolved: lcData.mediumSolved,
+          hardSolved: lcData.hardSolved,
+          currentStreak: lcData.currentStreak,
+          totalRepositories: dbUser.stats?.totalRepositories || 0
+        });
+
+        dbUser.connectedPlatforms.leetcode = {
+          connected: true,
+          handle: lcData.username,
+          verified: true,
+          solved: lcData.solved,
+          easySolved: lcData.easySolved,
+          mediumSolved: lcData.mediumSolved,
+          hardSolved: lcData.hardSolved,
+          ranking: lcData.ranking,
+          rating: dynamicRating,
+          lastSynced: new Date()
+        };
+        dbUser.stats.problemsSolved = lcData.solved;
+        dbUser.stats.leetcodeProblems = lcData.solved;
+        dbUser.stats.acceptanceRate = lcData.acceptanceRate;
+        dbUser.stats.activeDays = lcData.activeDays;
+        dbUser.stats.currentStreak = lcData.currentStreak;
+        dbUser.stats.rating = dynamicRating;
+      }
+
+      await dbUser.save();
+    }
+
+    // Also update in-memory current user
+    if (ghStats) {
+      current.connectedPlatforms.github = {
+        connected: true,
+        handle: ghStats.username,
+        verified: true,
+        contributions: ghStats.contributions,
+        repos: ghStats.publicRepos,
+        lastSynced: new Date().toISOString()
+      };
+      current.stats.totalRepositories = ghStats.publicRepos;
+      current.stats.totalContributions = ghStats.contributions;
+      if (ghStats.contributionCalendar) {
+        current.contributionCalendar = ghStats.contributionCalendar;
+      }
+    }
+
+    if (lcData) {
+      current.connectedPlatforms.leetcode = {
+        connected: true,
+        handle: lcData.username,
+        verified: true,
+        solved: lcData.solved,
+        easySolved: lcData.easySolved,
+        mediumSolved: lcData.mediumSolved,
+        hardSolved: lcData.hardSolved,
+        ranking: lcData.ranking,
+        rating: lcData.ranking || 1650,
+        lastSynced: new Date().toISOString()
+      };
+      current.stats.problemsSolved = lcData.solved;
+      current.stats.leetcodeProblems = lcData.solved;
+      current.stats.currentStreak = lcData.currentStreak;
+    }
+    req.app.locals.currentUser = current;
+
+    return res.json({
+      success: true,
+      message: 'All platform statistics and contribution calendar synchronized successfully',
+      user: dbUser || current,
+      stats: (dbUser || current).stats,
+      contributionCalendar: (dbUser || current).contributionCalendar
+    });
+  } catch (err) {
+    console.error('POST /api/stats/sync error:', err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // --- LEADERBOARD ROUTES (Strictly Real Registered Users from MongoDB) ---

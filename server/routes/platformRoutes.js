@@ -4,7 +4,7 @@ import { User } from '../models/User.js';
 import { PlatformStats } from '../models/PlatformStats.js';
 import { Problem } from '../models/Problem.js';
 import { fetchLeetCodeStats } from '../services/leetcodeService.js';
-import { fetchGitHubStats } from '../services/githubService.js';
+import { fetchGitHubStats, mergeLeetCodeContributions } from '../services/githubService.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { calculateRating } from '../utils/rating.js';
 
@@ -216,6 +216,19 @@ router.post('/connect/github', optionalAuth, async (req, res) => {
           updatedUser.avatar = stats.avatarUrl;
         }
 
+        if (stats.contributionCalendar) {
+          const lcStats = await PlatformStats.findOne({ userId, platform: 'leetcode' });
+          if (lcStats?.stats?.submissionCalendar) {
+            stats.contributionCalendar = mergeLeetCodeContributions(
+              stats.contributionCalendar,
+              lcStats.stats.submissionCalendar
+            );
+            stats.contributions = stats.contributionCalendar.totalContributions;
+            updatedUser.stats.totalContributions = stats.contributions;
+          }
+          updatedUser.contributionCalendar = stats.contributionCalendar;
+        }
+
         await updatedUser.save();
       }
 
@@ -253,6 +266,10 @@ router.post('/connect/github', optionalAuth, async (req, res) => {
       followers: stats.followers,
       following: stats.following
     };
+
+    if (stats.contributionCalendar) {
+      current.contributionCalendar = stats.contributionCalendar;
+    }
 
     if (stats.repositories?.length) {
       req.app.locals.repositories = stats.repositories;

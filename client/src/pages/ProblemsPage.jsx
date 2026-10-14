@@ -56,15 +56,18 @@ export default function ProblemsPage() {
   const loadProblems = async () => {
     try {
       const res = await api.problems.get();
-      setProblems(res.problems || []);
+      const rawList = res.problems || [];
+      const fallbackTitles = ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'];
+      const cleanList = rawList.filter(p => !fallbackTitles.includes(p.title) || p.isCustom);
+      setProblems(cleanList);
       if (res.stats) {
         setStats(res.stats);
-      } else if (res.problems?.length) {
+      } else if (cleanList.length) {
         setStats({
-          totalSolved: res.problems.length,
-          easySolved: res.problems.filter(p => p.difficulty === 'Easy').length,
-          mediumSolved: res.problems.filter(p => p.difficulty === 'Medium').length,
-          hardSolved: res.problems.filter(p => p.difficulty === 'Hard').length
+          totalSolved: cleanList.length,
+          easySolved: cleanList.filter(p => p.difficulty === 'Easy').length,
+          mediumSolved: cleanList.filter(p => p.difficulty === 'Medium').length,
+          hardSolved: cleanList.filter(p => p.difficulty === 'Hard').length
         });
       }
     } catch (err) {
@@ -81,9 +84,13 @@ export default function ProblemsPage() {
     setIsSyncing(true);
     setErrorMessage(null);
     try {
-      const res = await api.problems.sync();
+      const lcHandle = user?.connectedPlatforms?.leetcode?.handle;
+      const res = await api.problems.sync(lcHandle);
       if (res.success) {
-        if (res.problems) setProblems(res.problems);
+        const rawList = res.problems || [];
+        const fallbackTitles = ['Two Sum', 'LRU Cache Implementation', 'Reverse Linked List', 'Valid Parentheses'];
+        const cleanList = rawList.filter(p => !fallbackTitles.includes(p.title) || p.isCustom);
+        setProblems(cleanList);
         if (res.stats) setStats(res.stats);
         showToast(res.message || 'Successfully synced latest submissions!');
       } else {

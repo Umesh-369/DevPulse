@@ -4,9 +4,10 @@ import DevPulseLogo from '../components/common/DevPulseLogo';
 import { GitHubIcon, GoogleIcon } from '../components/common/PlatformIcons';
 import { Eye, EyeOff, ArrowRight, AlertTriangle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE } from '../services/api';
 import confetti from 'canvas-confetti';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE;
 
 export default function RegisterPage() {
   const [searchParams, setSearchParams] = useSearchParams();

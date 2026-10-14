@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, RefreshCw, LogOut, User, Settings, CheckCircle2 } from 'lucide-react';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
 export default function HeaderBar({ onOpenSearch }) {
@@ -28,13 +29,19 @@ export default function HeaderBar({ onOpenSearch }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSync = () => {
+  const handleSync = async () => {
     setSyncing(true);
-    setTimeout(() => {
+    try {
+      if (api.stats?.sync) {
+        await api.stats.sync();
+      }
+    } catch (err) {
+      console.warn('Quick sync notice:', err.message);
+    } finally {
       setSyncing(false);
       setSyncNotice(true);
       setTimeout(() => setSyncNotice(false), 2500);
-    }, 900);
+    }
   };
 
   const notifications = [

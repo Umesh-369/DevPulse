@@ -93,10 +93,13 @@ export default function DashboardPage() {
           {/* 4 KPI Stat Cards */}
           <StatCards stats={user?.stats} />
 
-          {/* 12-Month Contribution Heatmap */}
+          {/* Real GitHub 365-Day Contribution Graph */}
           <ContributionHeatmap
-            totalContributions={user?.stats?.totalContributions || 3214}
-            growth={user?.stats?.contributionsGrowth || '+18% from last period'}
+            calendar={analyticsData?.contributionCalendar || user?.contributionCalendar}
+            totalContributions={analyticsData?.contributionCalendar?.totalContributions ?? user?.stats?.totalContributions ?? 0}
+            growth={user?.stats?.contributionsGrowth || '+0% this year'}
+            githubHandle={user?.connectedPlatforms?.github?.handle || user?.github?.username}
+            isConnected={Boolean(user?.connectedPlatforms?.github?.connected || user?.github?.username || user?.connectedPlatforms?.github?.handle)}
           />
 
           {/* Bottom 3-Widget Row */}

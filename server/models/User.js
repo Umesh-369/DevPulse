@@ -149,6 +149,10 @@ const userSchema = new mongoose.Schema(
       activeDays: { type: Number, default: 0 },
       pullRequests: { type: Number, default: 0 }
     },
+    contributionCalendar: {
+      type: mongoose.Schema.Types.Mixed,
+      default: { totalContributions: 0, weeks: [], days: [] }
+    },
     connectedPlatforms: {
       github: {
         connected: { type: Boolean, default: false },
